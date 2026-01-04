@@ -274,7 +274,7 @@ function dnsapiAdd(row){
     // console.log(row);
     var option_name = '';
     var option_remark = '';
-    var option_type = 'cf';
+    var option_type = 'dns_cf';
     var option_val = '';
     var option_id = 0;
     if (typeof(row) != 'undefined'){
@@ -286,7 +286,6 @@ function dnsapiAdd(row){
         
     }
 
-    // console.log(option_name);
     function renderDnsapiOption(name, val){
         var vlist = {};
         if (val != ''){
@@ -303,18 +302,16 @@ function dnsapiAdd(row){
         }
 
 
+
         var key = getDnsapiKey(name);
         var klist = key.split(':');
-        // console.log(klist);
         var option_html = '';
         for (var i = 0; i < klist.length; i++) {
             var klist_val = '';
             if (klist[i] in vlist){
                 klist_val = vlist[klist[i]];
             }
-
-            option_html += "\
-                <span class='tname'>"+klist[i]+"</span>\
+            option_html += "<span class='tname'>"+klist[i]+"</span>\
                 <div class='info-r'>\
                     <input name='"+klist[i]+"' class='bt-input-text mr5' style='width:100%;' value='"+klist_val+"' placeholder='请输入对应值' type='text'>\
                 </div>";
@@ -379,7 +376,6 @@ function dnsapiAdd(row){
             $('select[name="type"]').html(option);
             $('select[name="type"]').change(function(){
                 var name = $(this).val();
-
                 if (option_type == name){
                     renderDnsapiOption(name, option_val);
                 } else {
@@ -667,11 +663,24 @@ function domainAdd(row){
                 var rdata = $.parseJSON(data.data);
                 for (var i = 0; i < rdata.length; i++) {
                     if (option_dnsapi_id == rdata[i]['id']){
-                        dnsapi_id_html += "<option value='"+rdata[i]['id']+"' selected>"+rdata[i]['name']+"</option>";
+                        dnsapi_id_html += "<option value='"+rdata[i]['id']+"' val='"+rdata[i]['val']+"' selected>"+rdata[i]['name']+"</option>";
                     } else {
-                        dnsapi_id_html += "<option value='"+rdata[i]['id']+"'>"+rdata[i]['name']+"</option>";
+                        dnsapi_id_html += "<option value='"+rdata[i]['id']+"' val='"+rdata[i]['val']+"'>"+rdata[i]['name']+"</option>";
                     }
                 }
+
+                $('select[name="dnsapi_id"]').change(function(){
+                    var val = $('select[name="dnsapi_id"]').find("option:selected").attr('val');
+                    var val_arr = val.split("|");
+                    for (var i = 0; i < val_arr.length; i++) {
+                        var param = val_arr[i];
+                        var strictEmailRegex = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+                        if(strictEmailRegex.test(param)){
+                            $('input[name="email"]').val(param);
+                        }
+                    }
+                    
+                });
                 $('select[name="dnsapi_id"]').html(dnsapi_id_html);
             });
         },

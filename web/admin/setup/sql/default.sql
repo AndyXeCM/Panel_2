@@ -32,12 +32,15 @@ CREATE TABLE IF NOT EXISTS `crontab` (
   `backup_to` TEXT DEFAULT 'off', 
   `sname` TEXT,
   `sbody` TEXT,
-  'stype' TEXT,
+  `stype` TEXT,
   `url_address` TEXT,
+  `attr` TEXT DEFAULT '',
   `add_time` TEXT,
   `update_time` TEXT
 );
 CREATE UNIQUE INDEX crontab_name_idx ON crontab(name);
+ALTER TABLE crontab ADD COLUMN attr TEXT DEFAULT '';
+
 
 CREATE TABLE IF NOT EXISTS `firewall` (
   `id` INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +50,6 @@ CREATE TABLE IF NOT EXISTS `firewall` (
   `add_time` TEXT,
   `update_time` TEXT
 );
-
 CREATE UNIQUE INDEX firewall_port_idx ON firewall(port);
 
 INSERT INTO `firewall` (`id`, `port`, `protocol`, `ps`, `add_time`, `update_time`) VALUES
@@ -84,13 +86,16 @@ CREATE TABLE IF NOT EXISTS `site_types` (
 );
 CREATE UNIQUE INDEX site_types_name_idx ON site_types(name);
 
+
 CREATE TABLE IF NOT EXISTS `domain` (
   `id` INTEGER PRIMARY KEY AUTOINCREMENT,
   `pid` INTEGER,
   `name` TEXT,
   `port` INTEGER,
+  `main` INTEGER DEFAULT '0',
   `add_time` TEXT
 );
+ALTER TABLE `domain` ADD COLUMN `main` INTEGER DEFAULT '0';
 
 CREATE TABLE IF NOT EXISTS `users` (
   `id` INTEGER PRIMARY KEY AUTOINCREMENT,

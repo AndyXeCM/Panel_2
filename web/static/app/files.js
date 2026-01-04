@@ -285,7 +285,7 @@ function openFilename(obj){
     var ext = getSuffixName(path);
 
     // console.log(path,ext);
-    if (inArray(ext,['html','htm','php','txt','md','js','css','scss','json','c','h','pl','py','java','log','conf','sh','json','ini'])){
+    if (inArray(ext,['html','htm','php','lua','rs','py','txt','md','js','css','scss','json','c','h','pl','java','log','conf','sh','json','ini', 'yml','yaml'])){
         onlineEditFile(0, path);
     }
 
@@ -490,10 +490,12 @@ function getFiles(Path) {
             var displayCompress = 1;
             if(isCompressFile(fmp[0])){
                 bodyZip = "<a class='btlink' href='javascript:;' onclick=\"unCompressFile('" + rdata.path +"/" +fmp[0] + "')\">解压</a> | ";
+            } else {
+                bodyZip = "<a class='btlink' href='javascript:;' onclick=\"zip('" + rdata.path +"/" +fmp[0] + "');\">压缩</a> | ";
             }
             
             if(isText(fmp[0])){
-                bodyZip = "<a class='btlink' href='javascript:;' onclick=\"onlineEditFile(0,'" + rdata.path +"/"+ fmp[0] + "')\">编辑</a> | ";
+                bodyZip += "<a class='btlink' href='javascript:;' onclick=\"onlineEditFile(0,'" + rdata.path +"/"+ fmp[0] + "')\">编辑</a> | ";
             }
 
             if(isImage(fmp[0])){
@@ -515,8 +517,7 @@ function getFiles(Path) {
                     <span><a class='btlink' href='javascript:;' onclick=\"copyFile('" + rdata.path +"/"+ fmp[0] + "')\">复制</a> | \
                     <a class='btlink' href='javascript:;' onclick=\"cutFile('" + rdata.path +"/"+ fmp[0] + "')\">剪切</a> | \
                     <a class='btlink' href='javascript:;' onclick=\"reName(0,'" + fmp[0] + "')\">重命名</a> | \
-                    <a class='btlink' href=\"javascript:setChmod(0,'" + rdata.path +"/"+ fmp[0] + "');\">权限</a> | \
-                    <a class='btlink' href=\"javascript:zip('" + rdata.path +"/" +fmp[0] + "');\">压缩</a> | "
+                    <a class='btlink' href=\"javascript:setChmod(0,'" + rdata.path +"/"+ fmp[0] + "');\">权限</a> | "
                     + bodyZip
                     + download
                     + "<a class='btlink' href='javascript:;' onclick=\"deleteFile('" + rdata.path +"/"+ fmp[0] + "')\">删除</a>\
@@ -675,17 +676,9 @@ function getFiles(Path) {
         });
 
         $(".folderBox,.folderBoxTr").mousedown(function(e){
-            // console.log(e);
-            var count = totalFile();
-            if(e.which == 3) {
-                if(count <= 1){
-                    var a = $(this);
-                    var option = rightMenuClick(a.attr("filetype"),a.attr("data-path"),a.find("input").val());
-                    a.contextify(option);
-                } else{
-                    rightMenuClickAll(e);
-                }
-            }
+            var box = $(this);
+            var option = rightMenuClick(box.attr("filetype"),box.attr("data-path"),box.find("input").val());
+            box.contextify(option);
         });
         
         //每页行数
@@ -732,7 +725,7 @@ function bindselect(){
             $(".ui-selectee").find("input").prop("checked", false);
             $(".ui-selecting").find("input").prop("checked", true);
             showSeclect();
-            $("#rmenu").hide()
+            $("#rmenu").hide();
         }
     });
     $("#filesBody,#fileCon").selectable("refresh");
@@ -827,9 +820,10 @@ function batch(type,access){
         var names = '';
         for(var i=0;i<len;i++){
             if(el[i].checked == true && el[i].value != 'on'){
-                names += el[i].value + ',';
+                names += path + "/" + el[i].value + ',';
             }
         }
+        // console.log(names);
         zip(names);
         return;
     }
@@ -1307,67 +1301,116 @@ function pasteTo(path,copyName,cutName,fileName){
 
 //压缩目录
 function zip(dirName,submits) {
-    var path = $("#DirPathPlace input").val();
     if(submits != undefined){
-        if(dirName.indexOf(',') == -1){
-            tmp = $("#sfile").val().split('/');
-            sfile = encodeURIComponent(tmp[tmp.length-1]);
-        }else{
-            sfile = encodeURIComponent(dirName);
-        }
-        
-        dfile = encodeURIComponent($("#dfile").val());
-        layer.closeAll();
-        layer.msg(lan.files.zip_the, {icon: 16,time: 0,shade: [0.3, '#000']});
-        $.post('/files/zip', 'sfile=' + sfile + '&dfile=' + dfile + '&type=tar&path='+encodeURIComponent(path), function(rdata) {
+        var sfile = $("#sfile").val();
+        var path = $("#path").val();
+        var ztype = $('select[name="z_type"]').val();
+        var dfile = $("#dfile").val();
+
+        layer.msg('正在压缩,请稍候...', {icon: 16,time: 0,shade: [0.3, '#000']});
+        $.post('/files/zip', 'sfile=' + sfile + '&dfile=' + dfile + '&type='+ztype+'&path='+encodeURIComponent(path), function(rdata) {
             layer.closeAll();
             if(rdata == null || rdata == undefined){
-                layer.msg(lan.files.zip_ok,{icon:1});
-                getFiles(path)
+                layer.msg('服务器正在后台压缩文件,请稍候刷新文件列表查看进度!',{icon:1});
+                getFiles($("#DirPathPlace input").val());
                 reloadFiles();
                 return;
             }
-            layer.msg(rdata.msg, {icon: rdata.status ? 1 : 2});
-            if(rdata.status) getFiles(path);
+
+            showMsg(rdata.msg, function(){
+                if(rdata.status) {
+                    getFiles($("#DirPathPlace input").val());
+                }
+            },{icon: rdata.status ? 1 : 2});
         },'json');
         return
     }
-    
-    param = dirName;
+
+    var randStr = getRandomString(6);
+
     if(dirName.indexOf(',') != -1){
-        tmp = path.split('/');
-        dirName = path + '/' + tmp[tmp.length-1];
+        dirNameArrs = dirName.split(',');
+        dirNameArr = dirNameArrs[0].split('/');
+        fileName = dirNameArr[dirNameArr.length-1];
+        sfile = dirName;
+        pathName = dirNameArrs[0].replace('/'+fileName,'');
+    } else {
+        dirNameArr = dirName.split('/');
+        fileName = dirNameArr[dirNameArr.length-1];
+        sfile = fileName;
+        pathName = dirName.replace('/'+fileName,'');
     }
-    
+
+    var defaultDfile = pathName + '/' + fileName+'_'+randStr+'.tar.gz';
+
     layer.open({
         type: 1,
         shift: 5,
         closeBtn: 1,
         area: '650px',
-        title: lan.files.zip_title,
-        content: '<div class="bt-form pd20 pb70">'
-                    +'<div class="line noborder">'
-                    +'<input type="text" class="form-control" id="sfile" value="' +param + '" placeholder="" style="display:none" />'
-                    +'<span>'+lan.files.zip_to+'</span>\
-                        <input type="text" class="bt-input-text" id="dfile" value="'+dirName + '.tar.gz" placeholder="'+lan.files.zip_to+'" style="width: 75%; display: inline-block; margin: 0px 10px 0px 20px;" />\
-                        <span class="glyphicon glyphicon-folder-open cursor" onclick="changePath(\'dfile\')"></span>'
-                    +'</div>'
-                    +'<div class="bt-form-submit-btn">'
-                    +'<button type="button" class="btn btn-danger btn-sm btn-title" onclick="layer.closeAll()">'+lan.public.close+'</button>'
-                    +'<button type="button" id="ReNameBtn" class="btn btn-success btn-sm btn-title" onclick="zip(\'' + param + '\',1)">'+lan.files.file_menu_zip+'</button>'
-                    +'</div>'
+        title: '压缩文件['+fileName+']',
+        btn: ['确定','取消'],
+        content: '<div class="bt-form pd20">'
+                    + '<div class="line noborder">'
+                    + '<span class="tname">压缩类型</span>\
+                        <div class="info-r">\
+                            <select class="bt-input-text mr5" name="z_type" style="width:458px;">\
+                            <option value="tar_gz" selected>tar.gz (推荐)</option>\
+                            <option value="zip">zip (通用格式)</option>\
+                            <option value="rar">rar (WinRAR对中文兼容较好)</option>\
+                            <option value="7z">7z (压缩率极高的压缩格式)</option>\
+                            <option value="xz">xz (压缩率极高的压缩格式)</option>\
+                            <option value="bz2">bz2 (压缩率极高的压缩格式)</option>\
+                            </select>\
+                        </div>\
+                    </div>'
+                    //
+                    + '<div class="line noborder">'
+                    + '<input type="text" id="sfile" value="' + sfile + '" style="display:none" />'
+                    + '<input type="text" id="path" value="' + pathName + '" style="display:none" />'
+                    + '<span class="tname">压缩路径</span>\
+                    <input type="text" class="bt-input-text" id="dfile" value="' + defaultDfile + '" placeholder="压缩到" style="width: 75%; display: inline-block; margin: 0px 10px 0px 0px;" />\
+                    <span  id="change_dir" class="glyphicon glyphicon-folder-open cursor"></span>'
+                    + '</div>'
                 +'</div>',
         success:function(){
-            $("#dfile").change(function(){
-                var dfile = $(this).val()
-                tmp = dfile.split('.');
-                if(tmp[tmp.length-1] != 'gz'){
-                    var path = $("#DirPathPlace input").val();
-                    tmp = path.split('/');
-                    dfile += '/' + tmp[tmp.length-1] + '.tar.gz'
-                    $(this).val(dfile.replace(/\/\//g,'/'))
+            $('#change_dir').click(function(){
+                changePathCallback('dfile', function(val){
+                    var z_type = $('select[name="z_type"]').val();
+                    $('#dfile').val(val+'/'+fileName+'_'+randStr+'.'+z_type.replace('_','.'));
+                    $('#path').val(val);
+                });
+            });
+
+            $('select[name="z_type"]').change(function(){
+                var z_type = $(this).val();
+                var path = $('#path').val();
+                var newPathName = path+'/'+fileName+'_'+randStr;
+                if (z_type == 'tar_gz') {
+                    $("#dfile").val(newPathName + '.tar.gz');
+                } else if (z_type == 'zip') {
+                    $("#dfile").val(newPathName + '.zip');
+                } else if (z_type == 'rar') {
+                    $("#dfile").val(newPathName + '.rar');
+                } else if (z_type == 'gz') {
+                    $("#dfile").val(newPathName + '.gz');
+                } else if (z_type == '7z') {
+                    $("#dfile").val(newPathName + '.7z');
+                } else if (z_type == 'xz') {
+                    $("#dfile").val(newPathName + '.xz');
+                } else if (z_type == 'bz2') {
+                    $("#dfile").val(newPathName + '.tar.bz2');
                 }
             });
+
+            $("#dfile").change(function(){
+                var dfile = $(this).val();
+                $(this).val(dfile.replace(/\/\//g,'/'));
+            });
+        },
+        btn1: function(index){
+            zip(dirName,1);
+            return false;
         }
     });
     
@@ -1424,7 +1467,7 @@ function unZip(fileName, type) {
 function isCompressFile(fileName){
     var ext = fileName.split('.');
     var extName = ext[ext.length-1].toLowerCase();
-    var support = ['zip','gz','tgz','rar'];
+    var support = ['zip','gz','tgz','rar','7z','xz','bz2'];
     for (x in support) {
         if (support[x]==extName){
             return true;
@@ -1705,6 +1748,9 @@ function onAccess(){
     }
 }
 
+function forcePpageRefresh(){
+    location.reload(true);
+}
 
 //右键菜单
 function rightMenuClick(type,path,name){
@@ -1721,8 +1767,7 @@ function rightMenuClick(type,path,name){
         options.items.push({text: lan.files.file_menu_del, onclick: function() {
             deleteDir(path)}
         });
-    }
-    else if(isText(type)){
+    } else if(isText(type)){
         options.items.push({text: lan.files.file_menu_edit, onclick: function() {
             onlineEditFile(0,path);
         }},{text: lan.files.file_menu_down, onclick: function() {
@@ -1730,8 +1775,7 @@ function rightMenuClick(type,path,name){
         }},{ text: lan.files.file_menu_del, onclick: function() {
             deleteFile(path);
         }});
-    }
-    else if(displayZip != -1){
+    } else if(displayZip != -1){
         options.items.push({text: lan.files.file_menu_unzip, onclick: function() {
             unZip(path,displayZip);
         }},{text: lan.files.file_menu_down, onclick: function() {
@@ -1739,8 +1783,7 @@ function rightMenuClick(type,path,name){
         }},{text: lan.files.file_menu_del, onclick: function() {
             deleteFile(path);
         }});
-    }
-    else if(isImage(type)){
+    } else if(isImage(type)){
         options.items.push({text: lan.files.file_menu_img, onclick: function() {
             getImage(path);
         }},{text: lan.files.file_menu_down, onclick: function() {
@@ -1748,14 +1791,17 @@ function rightMenuClick(type,path,name){
         }},{text: lan.files.file_menu_del, onclick: function() {
             deleteFile(path);
         }});
-    }
-    else{
+    } else {
         options.items.push({text: lan.files.file_menu_down, onclick: function() {
             getFileBytes(path);
         }},{text: lan.files.file_menu_del, onclick: function() {
             deleteFile(path);
         }});
     }
+
+    options.items.push({text: '强制刷新页面', onclick: function() {
+        forcePpageRefresh();
+    }});
     return options;
 }
 
@@ -1786,7 +1832,7 @@ function getPathSize(){
 }
 
 $("body").not(".def-log").click(function(){
-    $("#rmenu").hide()
+    $("#rmenu").hide();
 });
 
 //指定路径

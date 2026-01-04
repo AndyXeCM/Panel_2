@@ -1029,13 +1029,14 @@ function webEdit(id,website,endTime,addtime){
 	// <p onclick='dirBinding("+id+")'>子目录绑定</p>\
 	layer.open({
 		type: 1,
-		area: ['700px','570px'],
+		area: ['700px','603px'],
 		title: '站点修改['+website+']  --  添加时间['+addtime+']',
 		closeBtn: 1,
 		shift: 0,
 		content: "<div class='bt-form'>\
 			<div class='bt-w-menu pull-left'>\
 				<p class='bgw' onclick=\"domainEdit(" + id + ",'" + website + "')\">域名管理</p>\
+				<p onclick='dirBinding("+id+")'>子目录绑定</p>\
 				<p onclick='webPathEdit("+id+")'>网站目录</p>\
 				<p onclick='limitNet("+id+")'>流量限制</p>\
 				<p onclick=\"rewrite('"+website+"')\">伪静态</p>\
@@ -1551,7 +1552,7 @@ function to301(siteName, type, obj){
 		if (res.status) {
 			var data = res.data.result;
 			data.forEach(function(item){
-				var lan_r_type = item.r_type == 0 ? "永久重定向" : "临时重定向";
+				var lan_r_type = item.r_type == 0 ? "临时重定向" : "永久重定向";
 				var keep_path = item.keep_path == 0 ? "不保留" : "保留";
 
 				var switchProxy  = '<span onclick="toRedirect(\''+siteName+'\',\''+ item.id +'\',10)" style="color:rgb(92, 184, 92);" class="btlink glyphicon glyphicon-play"></span>';
@@ -2118,7 +2119,7 @@ function renderDnsapiHtml(data){
 	var fields_html = '';
 
 	for (var d in fields) {
-		fields_html += "<span class='tname'>"+d+"</span>\
+		fields_html += "<span class='tname tips' data-toggle='tooltip' data-original-title='"+d+"'>"+d+"</span>\
 	    <div class='info-r'>\
 	        <input name='"+d+"' class='bt-input-text mr5' style='width:100%;' value='"+fields[d]+"' type='text'>\
 	    </div>";
@@ -2152,6 +2153,9 @@ function renderDnsapiHtml(data){
 				</div>\
 			</div>\
 		</form>",
+		success:function(){
+			$('[data-toggle="tooltip"]').tooltip();
+		},
         yes:function(index,l) {
             var type_name = $('select[name="type_name"]').val();
             var data_field = {};
@@ -2279,13 +2283,26 @@ function opSSLNow(type, id, siteName, callback){
 function opSSLAcme(type, id, siteName, callback){
 	var acme =  '<div class="apply_ssl">\
 		<div class="label-input-group">\
-			<div class="line mtb10">\
+			<div class="line">\
 				<span class="tname text-center">验证方式</span>\
 				<div style="margin-top:7px;display:inline-block">\
 					<input type="radio" name="apply_type" value="file" id="check_file" checked="checked"/>\
   					<label class="mr20" for="check_file" style="font-weight:normal">文件验证</label></label>\
   					<input type="radio" name="apply_type" value="dns" id="check_dns"/>\
   					<label class="mr20" for="check_dns" style="font-weight:normal">DNS验证</label></label>\
+  				</div>\
+	  		</div>\
+	  		<div class="line">\
+				<span class="tname text-center">证书</span>\
+				<div style="margin-top:7px;display:inline-block">\
+					<input type="radio" name="apply_ca" value="default" id="ca_default" checked="checked"/>\
+  					<label class="mr20" for="ca_default" style="font-weight:normal">默认</label></label>\
+  					<input type="radio" name="apply_ca" value="let" id="ca_letsencrypt"/>\
+  					<label class="mr20" for="ca_letsencrypt" style="font-weight:normal">letsencrypt</label></label>\
+  					<input type="radio" name="apply_ca" value="zerossl" id="ca_zerossl/>\
+  					<label class="mr20" for="ca_zerossl" style="font-weight:normal">zerossl</label></label>\
+  					<input type="radio" name="apply_ca" value="buypass" id="ca_buypass/>\
+  					<label class="mr20" for="ca_buypass" style="font-weight:normal">buypass</label></label>\
   				</div>\
 	  		</div>\
 	  		<div class="line mtb10" id="dnsapi_option" style="display:none;">\
@@ -2304,7 +2321,7 @@ function opSSLAcme(type, id, siteName, callback){
   				</div>\
   			</div>\
   			<div class="check_message line">\
-  				<div style="margin-left:100px">\
+  				<div style="margin-left:100px; margin-top:8px;">\
   					<input type="checkbox" name="checkDomain" id="checkDomain" checked="">\
   					<label class="mr20" for="checkDomain" style="font-weight:normal">提前校验域名(提前发现问题,减少失败率)</label>\
   				</div>\
@@ -2727,6 +2744,10 @@ function newAcmeHandApplyNotice(siteName, id, domains, data){
 
 				var apply_type = $('input[name="apply_type"]:checked').val();
 				pdata['apply_type'] = apply_type;
+
+				var apply_ca = $('input[name="apply_ca"]:checked').val();
+				pdata['apply_ca'] = apply_ca;
+
 				if (apply_type == 'dns'){
 					pdata['dnspai'] = $('#dnsapi_option option:selected').val();
 				}
@@ -2763,9 +2784,13 @@ function newAcmeSSL(siteName, id, domains){
 
 		var apply_type = $('input[name="apply_type"]:checked').val();
 		pdata['apply_type'] = apply_type;
+
+		var apply_ca = $('input[name="apply_ca"]:checked').val();
+		pdata['apply_ca'] = apply_ca;
+
 		if (apply_type == 'dns'){
 			pdata['dnspai'] = $('#dnsapi_option option:selected').val();
-		}
+		}		
 
 		pdata['dns_alias'] = $("input[name='dns_alias']").val();
 		$.post('/site/create_acme',pdata,function(rdata){
@@ -2927,7 +2952,21 @@ function rewrite(siteName){
 			$("#webedit-con").html(webBakHtml);
 			
 			var editor = CodeMirror.fromTextArea(document.getElementById("rewriteBody"), {
-	            extraKeys: {"Ctrl-Space": "autocomplete"},
+	            extraKeys: {
+	            	"Ctrl-Space": "autocomplete",
+	            	"Ctrl-F": "findPersistent",
+					"Ctrl-H": "replaceAll",
+					"Ctrl-S": function() {
+						$("#rewriteBody").empty();
+						$("#rewriteBody").text(editor.getValue());
+						setRewrite(filename, encodeURIComponent(editor.getValue()));
+					},
+					"Cmd-S":function() {
+						$("#rewriteBody").empty();
+						$("#rewriteBody").text(editor.getValue());
+						setRewrite(filename, encodeURIComponent(editor.getValue()));
+					},
+	            },
 				lineNumbers: true,
 				matchBrackets:true,
 			});

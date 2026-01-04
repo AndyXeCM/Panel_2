@@ -69,6 +69,13 @@ def execShell(cmdstring, cwd=None, timeout=None, shell=True):
             error = str(e)
     return (success, error)
 
+def checkBinExist(name):
+    d = execShell('which ' + name)
+    if d[0] != '':
+        return True
+    return False
+
+
 
 def getTracebackInfo():
     import traceback
@@ -416,9 +423,18 @@ def md5(content):
         return False
 
 def hasPwd(password):
-    # 加密密码字符
-    import crypt
-    return crypt.crypt(password, password)
+    '''
+    加密密码字符
+    '''
+    # python3 -c "import crypt"
+    # python3 -c 'import crypt; print(crypt.crypt(""))'
+    # import crypt
+    # return crypt.crypt(password, password)
+    import bcrypt
+    salt = bcrypt.gensalt()
+    hpw = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hpw.decode('utf-8')
+
     
 def getFileMd5(filename):
     # 文件的MD5值
@@ -480,6 +496,9 @@ def checkDomainPanel():
         return False
 
     ip = getHostAddr()
+    if isVaildIpV6(ip):
+        return False
+
     if domain == '':
         if ip in ['127.0.0.1', 'localhost', '::1']:
             return False
@@ -546,6 +565,7 @@ def getSslCrt():
 
 
 def getOs():
+    # python3 -c 'import sys; print(sys.platform)'
     return sys.platform
 
 def getOsName():
@@ -1321,8 +1341,8 @@ def getAcmeDir():
         cmd = "who | sed -n '2, 1p' |awk '{print $1}'"
         user = execShell(cmd)[0].strip()
         acme = '/Users/' + user + '/.acme.sh'
-    if not os.path.exists(acme):
-        acme = '/.acme.sh'
+    # if not os.path.exists(acme):
+    #     acme = '/.acme.sh'
     return acme
 
 
@@ -2038,7 +2058,6 @@ def echoEnd(tag):
     print("=" * 89)
     print("☆{}完成[{}]".format(tag, formatDate()))
     print("=" * 89)
-    print("\n")
 
 
 def echoInfo(msg):

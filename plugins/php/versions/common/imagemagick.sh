@@ -12,7 +12,7 @@ serverPath=$(dirname "$rootPath")
 sourcePath=${serverPath}/source/php
 SYS_ARCH=`arch`
 LIBNAME=imagick
-LIBV=3.7.0
+LIBV=3.8.0
 sysName=`uname`
 actionType=$1
 version=$2
@@ -67,6 +67,10 @@ Install_lib()
 		if [ "${SYS_ARCH}" == "aarch64" ] && [ "$version" -lt "56" ];then
 			OPTIONS="$OPTIONS --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu"
 		fi
+
+		# if [ "$version" -gt "74" ];then
+		# 	OPTIONS="$OPTIONS --disable-openmp"
+		# fi
 
 		$serverPath/php/$version/bin/phpize
 		./configure --with-php-config=$serverPath/php/$version/bin/php-config $OPTIONS

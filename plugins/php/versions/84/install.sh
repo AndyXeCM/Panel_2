@@ -9,8 +9,9 @@ serverPath=$(dirname "$rootPath")
 sourcePath=${serverPath}/source
 sysName=`uname`
 
-version=8.4.2
+version=8.4.15
 PHP_VER=84
+md5_file_ok=a060684f614b8344f9b34c334b6ba8db1177555997edb5b1aceab0a4b807da7e
 Install_php()
 {
 #------------------------ install start ------------------------------------#
@@ -28,6 +29,21 @@ if [ "$?" == "0" ];then
 fi
 
 if [ ! -d $sourcePath/php/php${PHP_VER} ];then
+
+	# ----------------------------------------------------------------------- #
+	# 中国优化安装
+	cn=$(curl -fsSL -m 10 -s http://ipinfo.io/json | grep "\"country\": \"CN\"")
+	LOCAL_ADDR=common
+	if [ ! -z "$cn" ];then
+		LOCAL_ADDR=cn
+	fi
+
+	if [ "$LOCAL_ADDR" == "cn" ];then
+		if [ ! -f $sourcePath/php/php-${version}.tar.xz ];then
+			wget --no-check-certificate -O $sourcePath/php/php-${version}.tar.xz https://mirrors.nju.edu.cn/php/php-${version}.tar.xz
+		fi
+	fi
+	# ----------------------------------------------------------------------- #
 	
 
 	if [ ! -f $sourcePath/php/php-${version}.tar.xz ];then
@@ -35,14 +51,13 @@ if [ ! -d $sourcePath/php/php${PHP_VER} ];then
 	fi
 
 	#检测文件是否损坏.
-	# md5_file_ok=92636453210f7f2174d6ee6df17a5811368f556a6c2c2cbcf019321e36456e01
-	# if [ -f $sourcePath/php/php-${version}.tar.xz ];then
-	# 	md5_file=`sha256sum $sourcePath/php/php-${version}.tar.xz  | awk '{print $1}'`
-	# 	if [ "${md5_file}" != "${md5_file_ok}" ]; then
-	# 		echo "PHP${version} 下载文件不完整,重新安装"
-	# 		rm -rf $sourcePath/php/php-${version}.tar.xz
-	# 	fi
-	# fi
+	if [ -f $sourcePath/php/php-${version}.tar.xz ];then
+		md5_file=`sha256sum $sourcePath/php/php-${version}.tar.xz  | awk '{print $1}'`
+		if [ "${md5_file}" != "${md5_file_ok}" ]; then
+			echo "PHP${version} 下载文件不完整,重新安装"
+			rm -rf $sourcePath/php/php-${version}.tar.xz
+		fi
+	fi
 	
 	cd $sourcePath/php && tar -Jxf $sourcePath/php/php-${version}.tar.xz
 	mv $sourcePath/php/php-${version} $sourcePath/php/php${PHP_VER}
@@ -104,8 +119,8 @@ if [ "$sysName" == "Darwin" ];then
 	export OPENSSL_CFLAGS="-I${LIB_DEPEND_DIR}/include"
 	export OPENSSL_LIBS="-L/${LIB_DEPEND_DIR}/lib -lssl -lcrypto -lz"
 else
-	cd ${rootPath}/plugins/php/lib && /bin/bash openssl_30.sh
-	export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$serverPath/lib/openssl30/lib/pkgconfig
+	cd ${rootPath}/plugins/php/lib && /bin/bash openssl_35.sh
+	export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$serverPath/lib/openssl35/lib/pkgconfig
 	OPTIONS="$OPTIONS --with-openssl"
 fi
 

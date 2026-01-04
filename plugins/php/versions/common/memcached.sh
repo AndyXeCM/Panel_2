@@ -12,13 +12,18 @@ serverPath=$(dirname "$rootPath")
 sourcePath=${serverPath}/source/php
 SYS_ARCH=`arch`
 LIBNAME=memcached
-LIBV=3.2.0
+LIBV=3.3.0
 sysName=`uname`
 actionType=$1
 version=$2
 
 if [ "$version" -lt "70" ];then
 	LIBV=2.2.0
+fi
+
+
+if [ "$version" == "85" ];then
+	LIBV=3.4.0
 fi
 
 LIB_PATH_NAME=lib/php

@@ -110,6 +110,8 @@ def sysConf():
 def secRunLog():
     if os.path.exists('/var/log/auth.log'):
         return '/var/log/auth.log'
+    if os.path.exists('/var/log/messages'):
+        return '/var/log/messages'
     return '/var/log/secure'
 
 
@@ -122,11 +124,19 @@ def msgRunLog():
 def cronRunLog():
     if os.path.exists('/var/log/syslog.log'):
         return '/var/log/syslog.log'
+    if os.path.exists('/var/log/syslog'):
+        return '/var/log/syslog'
     return '/var/log/cron'
 
 
 def systemRunLog():
     return '/var/log/syslog'
+
+def showHosts():
+    return '/etc/hosts'
+
+def showResolv():
+    return '/etc/resolv.conf'
 
 if __name__ == "__main__":
     func = sys.argv[1]
@@ -154,5 +164,9 @@ if __name__ == "__main__":
         print(cronRunLog())
     elif func == 'sys_run_log':
         print(systemRunLog())
+    elif func == 'hosts':
+        print(showHosts())
+    elif func == 'resolv':
+        print(showResolv())
     else:
         print('err')

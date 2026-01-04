@@ -9,8 +9,9 @@ serverPath=$(dirname "$rootPath")
 sourcePath=${serverPath}/source
 sysName=`uname`
 
-version=8.3.15
+version=8.3.28
 PHP_VER=83
+md5_file_ok=25e3860f30198a386242891c0bf9e2955931f7b666b96c3e3103d36a2a322326
 Install_php()
 {
 #------------------------ install start ------------------------------------#
@@ -48,9 +49,8 @@ if [ ! -d $sourcePath/php/php${PHP_VER} ];then
 	if [ ! -f $sourcePath/php/php-${version}.tar.xz ];then
 		wget --no-check-certificate -O $sourcePath/php/php-${version}.tar.xz https://www.php.net/distributions/php-${version}.tar.xz
 	fi
-
+	
 	#检测文件是否损坏.
-	md5_file_ok=3df5d45637283f759eef8fc3ce03de829ded3e200c3da278936a684955d2f94f
 	if [ -f $sourcePath/php/php-${version}.tar.xz ];then
 		md5_file=`sha256sum $sourcePath/php/php-${version}.tar.xz  | awk '{print $1}'`
 		if [ "${md5_file}" != "${md5_file_ok}" ]; then

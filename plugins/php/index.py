@@ -155,7 +155,7 @@ def contentReplace(content, version):
 
 def makeOpenrestyConf():
     phpversions = ['00', '52', '53', '54', '55', '56',
-                   '70', '71', '72', '73', '74', '80', '81', '82', '83','84']
+                   '70', '71', '72', '73', '74', '80', '81', '82', '83','84','85']
 
     sdir = mw.getServerDir()
 
@@ -344,7 +344,7 @@ def phpOp(version, method):
 
 
 def start(version):
-    cmd = 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/www/server/lib/icu/lib:/opt/homebrew/lib'
+    cmd = 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/www/server/lib/icu/lib:/usr/lib/x86_64-linux-gnu/:/opt/homebrew/lib'
     mw.execShell(cmd)
     return phpOp(version, 'start')
 

@@ -48,12 +48,14 @@ class crontab(object):
         dbdata['where1'] = data['where1']
         dbdata['where_hour'] = data['hour']
         dbdata['where_minute'] = data['minute']
-        dbdata['save'] = data['save']
-        dbdata['backup_to'] = data['backup_to']
-        dbdata['sname'] = data['sname']
-        dbdata['sbody'] = data['sbody']
         dbdata['stype'] = data['stype']
-        dbdata['url_address'] = data['url_address']
+
+        dbdata['sname'] = mw.getDefault(data, 'sname', '')
+        dbdata['backup_to'] = mw.getDefault(data, 'backup_to', '')
+        dbdata['save'] = mw.getDefault(data, 'save', '')
+        dbdata['sbody'] = mw.getDefault(data, 'sbody', '')
+        dbdata['url_address'] = mw.getDefault(data, 'url_address', '')
+        dbdata['attr'] = mw.getDefault(data, 'attr', '')
 
         if not self.removeForCrond(info['echo']):
             return mw.returnData(False, '无法写入文件，是否开启了系统加固功能!')
@@ -114,12 +116,12 @@ class crontab(object):
         if data['status'] == status:
             status = 0
             status_msg = '关闭'
+            thisdb.setCrontabStatus(cron_id, status)
             self.removeForCrond(data['echo'])
         else:
             data['status'] = 1
+            thisdb.setCrontabData(cron_id, data)
             self.syncToCrond(cron_id)
-
-        thisdb.setCrontabStatus(cron_id, status)
 
         msg = '修改计划任务[' + data['name'] + ']状态为[' + str(status_msg) + ']'
         mw.writeLog('计划任务', msg)
@@ -157,9 +159,9 @@ class crontab(object):
 
         cmd, title = self.getCrondCycle(data)
         cron_path = mw.getServerDir() + '/cron'
-        cron_name = self.getShell(data)
+        cron_shell = self.getShell(data)
 
-        cmd += ' ' + cron_path + '/' + cron_name + ' >> ' + cron_path + '/' + cron_name + '.log 2>&1'
+        cmd += ' ' + cron_path + '/' + cron_shell + ' >> ' + cron_path + '/' + cron_shell + '.log 2>&1'
 
         if not mw.isAppleSystem():
             sh_data = self.writeShell(cmd)
@@ -173,13 +175,15 @@ class crontab(object):
         add_dbdata['where1'] = data['where1']
         add_dbdata['where_hour'] = data['hour']
         add_dbdata['where_minute'] = data['minute']
-        add_dbdata['save'] = data['save']
-        add_dbdata['backup_to'] = data['backup_to']
-        add_dbdata['sname'] = data['sname']
-        add_dbdata['sbody'] = data['sbody']
         add_dbdata['stype'] = data['stype']
-        add_dbdata['echo'] = cron_name
-        add_dbdata['url_address'] = data['url_address']
+        add_dbdata['echo'] = cron_shell
+
+        add_dbdata['sname'] = mw.getDefault(data, 'sname', '')
+        add_dbdata['backup_to'] = mw.getDefault(data, 'backup_to', '')
+        add_dbdata['save'] = mw.getDefault(data, 'save', '')
+        add_dbdata['sbody'] = mw.getDefault(data, 'sbody', '')
+        add_dbdata['url_address'] = mw.getDefault(data, 'url_address', '')
+        add_dbdata['attr'] = mw.getDefault(data, 'attr', '')
 
         tid = thisdb.addCrontab(add_dbdata)
         return tid
@@ -412,6 +416,12 @@ class crontab(object):
 
     # 取执行脚本
     def getShell(self, param):
+        if not 'echo' in param:
+            cron_name = mw.md5(mw.md5(str(time.time()) + '_mw'))
+        else:
+            cron_name = param['echo']
+        param['echo'] = cron_name
+
         # try:
         stype = param['stype']
         if stype == 'toFile':
@@ -457,18 +467,20 @@ fi''' % (mw.getPanelDir(),)
                 source_stype = stype
                 stype = 'database'
 
+            if stype == 'path' and param['echo'] == '':
+                param['echo'] == "1"
+
             wheres = {
-                'path': head + "python3 " + script_dir + "/backup.py path " + param['sname'] + " " + str(param['save']),
-                'site':   head + "python3 " + script_dir + "/backup.py site " + param['sname'] + " " + str(param['save']),
+                'path': head + "python3 " + script_dir + "/backup.py path " + param['sname'] + " " + str(param['save']) + " " + str(param['echo']), 
+                'site':   head + "python3 " + script_dir + "/backup.py site " + param['sname'] + " " + str(param['save']) + " " + str(param['echo']),
                 'database': head + "python3 " + script_dir + "/backup.py database " + param['sname'] + " " + str(param['save']),
                 'logs':   head + "python3 " + script_dir + "/logs_backup.py " + param['sname'] + log + " " + str(param['save']),
                 'rememory': head + "/bin/bash " + script_dir + '/rememory.sh'
             }
             if param['backup_to'] != 'localhost':
                 cfile = mw.getPluginDir() + "/" + param['backup_to'] + "/index.py"
-
-                wheres['path'] = head + "python3 " + cfile + " path " + param['sname'] + " " + str(param['save'])
-                wheres['site'] = head + "python3 " + cfile + " site " + param['sname'] + " " + str(param['save'])
+                wheres['path'] = head + "python3 " + cfile + " path " + param['sname'] + " " + str(param['save']) + " " + str(param['echo'])
+                wheres['site'] = head + "python3 " + cfile + " site " + param['sname'] + " " + str(param['save']) + " " + str(param['echo'])
                 wheres['database'] = head + "python3 " + cfile + " " + source_stype + " " + param['sname'] + " " + str(param['save'])
             try:
                 shell = wheres[stype]
@@ -491,11 +503,9 @@ echo "--------------------------------------------------------------------------
         if not os.path.exists(cron_path):
             mw.execShell('mkdir -p ' + cron_path)
 
-        if not 'echo' in param:
-            cron_name = mw.md5(mw.md5(str(time.time()) + '_mw'))
-        else:
-            cron_name = param['echo']
+        
         file = cron_path + '/' + cron_name
+        # print(shell)
         mw.writeFile(file, self.checkScript(shell))
         mw.execShell('chmod 750 ' + file)
         return cron_name
@@ -512,20 +522,27 @@ echo "--------------------------------------------------------------------------
     def writeShell(self, bash_script):
         if mw.isAppleSystem():
             return mw.returnData(True, 'ok')
+
+        if not os.path.exists("/var/spool/cron/crontabs"):
+            mw.execShell("mkdir -p /var/spool/cron/crontabs")
+
         file = '/var/spool/cron/crontabs/root'
         sys_os = mw.getOs()
+        sys_name = mw.getOsName()
         if sys_os == 'darwin':
             file = '/etc/crontab'
-        elif sys_os.startswith("freebsd"):
+        elif sys_name.startswith("freebsd"):
             file = '/var/cron/tabs/root'
-
-        if not os.path.exists(file):
-            file = '/var/spool/cron/root'
+        # elif sys_name.startswith("ubuntu"):
+        #     file = '/var/spool/cron/root'
 
         if not os.path.exists(file):
             mw.writeFile(file, '')
-
         content = mw.readFile(file)
+        if not content:
+            content = ''
+        # if not content:
+        #     return mw.returnData(False, '计划任务配置文件不存在?') 
         content += str(bash_script) + "\n"
         if mw.writeFile(file, content):
             if not os.path.exists(file):

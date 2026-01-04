@@ -104,6 +104,9 @@ def mvFile(sfile, dfile):
         return mw.returnData(False, '移动或重名命文件失败!'+str(e))
 
 def unzip(sfile, dfile, stype, path):
+    if dfile == '' or dfile == '/':
+        return mw.returnData(False, '不能在根目录解压!')
+
     if not os.path.exists(sfile):
         return mw.returnData(False, '指定文件不存在!')
 
@@ -120,13 +123,17 @@ def unzip(sfile, dfile, stype, path):
             mw.execShell("cd " + path + " && tar -zxvf " + sfiles +" -C " + dfile + " > " + tmps + " 2>&1 &")
 
         if os.path.exists(dfile):
-            setFileAccept(dfile)
+            if dfile.startswith("/www/wwwroot"):
+                setFileAccept(dfile)
         mw.writeLog("文件管理", '文件[{1}]解压[{2}]成功!', (sfile, dfile))
         return mw.returnData(True, '文件解压成功!')
     except:
         return mw.returnData(False, '文件解压失败!')
 
 def uncompress(sfile, dfile, path):
+    if dfile == '' or dfile == '/':
+        return mw.returnData(False, '不能在根目录解压!')
+
     if not os.path.exists(sfile):
         return mw.returnData(False, '指定文件不存在!')
 
@@ -140,11 +147,14 @@ def uncompress(sfile, dfile, path):
     if suffix_gz == tar_gz:
         extension = suffix_gz
 
-    if not extension in ['tar.gz', 'gz', 'zip', 'rar']:
-        return mw.returnData(False, '现在仅支持gz,zip,rar格式解压!')
+    if not extension in ['tar.gz', 'gz', 'zip', 'rar', '7z', 'xz','bz2']:
+        return mw.returnData(False, '现在仅支持gz,zip,rar,7z,xz,bz2格式解压!')
 
-    if mw.isAppleSystem() and extension == 'rar':
-        return mw.returnData(False, 'macosx暂时不支持rar格式解压')
+    if extension == 'rar' and not mw.checkBinExist('rar'):
+        return mw.returnData(False, 'rar解压命令不存在，请安装!')
+    if extension == '7z' and not mw.checkBinExist('7z'):
+        return mw.returnData(False, '7z解压命令不存在，请安装!')
+
 
     cmd = "cd " + path + " "
     try:
@@ -152,18 +162,28 @@ def uncompress(sfile, dfile, path):
         if extension == 'zip':
             cmd += "&& unzip -o -d '" + dfile + "' '" + sfile + "' > " + tmps + " 2>&1 &"
             mw.execShell(cmd)
-        if extension == 'tar.gz':
+        elif extension == 'tar.gz':
             cmd += "&& tar -zxvf " + sfile + " -C " + dfile + " > " + tmps + " 2>&1 &"
             mw.execShell(cmd)
-        if extension == 'gz':
+        elif extension == 'gz':
             cmd += "&& gunzip -k " + sfile + " > " + tmps + " 2>&1 &"
             mw.execShell(cmd)
-        if extension == 'rar':
-            cmd +=  "&& unrar x " + sfile + " " + dfile + " > " + tmps + " 2>&1 &"
+        elif extension == 'rar':
+            cmd += "&& unrar x " + sfile + " " + dfile + " > " + tmps + " 2>&1 &"
+            mw.execShell(cmd)
+        elif extension == '7z':
+            cmd += "&& 7z x " + sfile + " -r -o" + dfile + " > " + tmps + " 2>&1 &"
+            mw.execShell(cmd)
+        elif extension == 'xz':
+            cmd += "&& tar -Jxvf " + sfile + " -C " + dfile + " > " + tmps + " 2>&1 &"
+            mw.execShell(cmd)
+        elif extension == 'bz2':
+            cmd += "&& tar -xjvf " + sfile + " -C " + dfile + " > " + tmps + " 2>&1 &"
             mw.execShell(cmd)
 
         if os.path.exists(dfile):
-            setFileAccept(dfile)
+            if dfile.startswith("/www/wwwroot"):
+                setFileAccept(dfile)
         mw.writeLog("文件管理", '文件[{1}]解压[{2}]成功!', (sfile, dfile,))
         return mw.returnData(True, '文件解压成功!')
     except Exception as e:
@@ -279,49 +299,63 @@ def batchPaste(path, stype):
 
 
 def zip(sfile, dfile, stype, path):
+    tmps = mw.getPanelDir() + '/logs/panel_exec.log'
     if sfile.find(',') == -1:
-        if not os.path.exists(path + '/' + sfile):
-            return mw.returnData(False, '指定文件不存在!')
-
-    try:
-        tmps = mw.getPanelDir() + '/logs/panel_exec.log'
         if stype == 'zip':
-            mw.execShell("cd '" + path + "' && zip '" + dfile +
-                         "' -r '" + sfile + "' > " + tmps + " 2>&1")
+            mw.execShell("cd '" + path + "' && zip '" + dfile + "' -r '" + sfile + "' > " + tmps + " 2>&1")
+        elif stype == '7z':
+            if not mw.checkBinExist('7z'):
+                return mw.returnData(False, '7z压缩命令不存在，请安装!')
+            mw.execShell("cd '" + path + "' && 7z a '" + dfile + "' -r '" + sfile + "' > " + tmps + " 2>&1")
+        elif stype == 'tar_gz':
+            mw.execShell("cd '" + path + "' && tar -zcvf '" + dfile + "' " + sfile + " > " + tmps + " 2>&1")
+        elif stype == 'xz':
+            # if not mw.checkBinExist('xz'):
+            #     return mw.returnData(False, 'xz压缩命令不存在，请安装!')
+            # dfile = dfile.strip(".xz")
+            # cmd = "cd '" + path + "' && tar -cvf '" + dfile + ".tar' " + sfile + " && xz -z '" + dfile + ".tar' > " + tmps + " 2>&1 &"
+            cmd = "cd '" + path + "' && tar -cJf '" + dfile + "' " + sfile + " > " + tmps + " 2>&1"
+            # print(cmd)
+            mw.execShell(cmd)
+        elif stype == 'rar':
+            if not mw.checkBinExist('rar'):
+                return mw.returnData(False, 'rar压缩命令不存在，请安装!')
+            mw.execShell("cd '" + path + "' && rar a '" + dfile + "' '" + sfile + "' > " + tmps + " 2>&1")
+        elif stype == 'bz2':
+            mw.execShell("cd '" + path + "' && tar -cjvf '" + dfile + "' " + sfile + " > " + tmps + " 2>&1")
         else:
-            sfiles = ''
-            for sfile in sfile.split(','):
-                if not sfile:
-                    continue
-                sfiles += " '" + sfile + "'"
-            mw.execShell("cd '" + path + "' && tar -zcvf '" + dfile + "' " + sfiles + " > " + tmps + " 2>&1")
-        setFileAccept(dfile)
+            return mw.returnData(False, '未知压缩格式')
         mw.writeLog("文件管理", '文件[{1}]压缩[{2}]成功!', (sfile, dfile))
-        return mw.returnData(True, '文件压缩成功!')
-    except:
-        return mw.returnData(False, '文件压缩失败!')
+    else:
+        sfiles = ''
+        for sfile in sfile.split(','):
+            if not sfile:
+                continue
+            if not os.path.exists(sfile):
+                return mw.returnData(False, '指定文件不存在!')
+            
+            sfiles += " '" + sfile.replace(path+'/','') + "'"
 
-def unzip(sfile, dfile, stype, path):
-    if not os.path.exists(sfile):
-        return mw.returnData(False, '指定文件不存在!')
-
-    try:
-        tmps = mw.getPanelDir() + '/logs/panel_exec.log'
         if stype == 'zip':
-            mw.execShell("cd " + path + " && unzip -o -d '" + dfile + "' '" + sfile + "' > " + tmps + " 2>&1 &")
+            mw.execShell("cd '" + path + "' && zip '" + dfile + "' -r " + sfiles + " > " + tmps + " 2>&1")
+        elif stype == '7z':
+            if not mw.checkBinExist('7z'):
+                return mw.returnData(False, '7z压缩命令不存在，请安装!')
+            mw.execShell("cd '" + path + "' && 7z a '" + dfile + "' -r " + sfiles + " > " + tmps + " 2>&1")
+        elif stype == 'tar_gz':
+            mw.execShell("cd '" + path + "' && tar -zcvf '" + dfile + "' " + sfiles + " > " + tmps + " 2>&1")
+        elif stype == 'rar':
+            if not mw.checkBinExist('rar'):
+                return mw.returnData(False, 'rar压缩命令不存在，请安装!')
+            mw.execShell("cd '" + path + "' && rar a '" + dfile + "' " + sfiles + " > " + tmps + " 2>&1")
+        elif stype == 'bz2':
+            mw.execShell("cd '" + path + "' && tar -cjvf '" + dfile + "' " + sfiles + " > " + tmps + " 2>&1")
         else:
-            sfiles = ''
-            for sfile in sfile.split(','):
-                if not sfile:
-                    continue
-                sfiles += " '" + sfile + "'"
-            mw.execShell("cd " + path + " && tar -zxvf " + sfiles + " -C " + dfile + " > " + tmps + " 2>&1 &")
+            return mw.returnData(False, '未知压缩格式')
 
-        setFileAccept(dfile)
-        mw.writeLog("文件管理", '文件[{1}]解压[{2}]成功!', (sfile, dfile))
-        return mw.returnData(True, '文件解压成功!')
-    except:
-        return mw.returnData(False, '文件解压失败!')
+        mw.writeLog("文件管理", '文件[{1}]压缩[{2}]成功!', (sfiles, dfile))
+    setFileAccept(dfile)
+    return mw.returnData(True, '文件压缩成功!')
 
 def getAccess(filename):
     data = {}
@@ -819,6 +853,20 @@ def getRecycleBin():
             continue
 
     return mw.returnJson(True, 'OK', data)
+
+def delRecycleBin(path):
+    rb_dir = mw.getRecycleBinDir()
+    rb_file = rb_dir + '/' + path
+    if os.path.isdir(rb_file):
+        import shutil
+        shutil.rmtree(rb_file)
+    else:
+        os.remove(rb_file)
+
+    tfile = path.replace('_mw_', '/').split('_t_')[0]
+    msg = mw.getInfo('已彻底从回收站删除[{1}]!', (tfile,))
+    mw.writeLog('文件管理', msg)
+    return mw.returnJson(True, msg)
 
 # 移动到回收站
 def mvRecycleBin(path):

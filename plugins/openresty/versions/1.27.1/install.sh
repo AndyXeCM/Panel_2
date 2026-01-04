@@ -3,7 +3,7 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin:/opt/hom
 export PATH
 
 # cd /Users/midoks/Desktop/mwdev/server/mdserver-web/plugins/openresty && bash install.sh install 1.21.4.2
-# cd /www/server/mdserver-web/plugins/openresty && bash install.sh install 1.21.4.2
+# cd /www/server/mdserver-web/plugins/openresty && bash install.sh install 1.27.1
 
 curPath=`pwd`
 rootPath=$(dirname "$curPath")
@@ -14,7 +14,7 @@ sysName=`uname`
 action=$1
 type=$2
 
-VERSION=1.27.1.1
+VERSION=1.27.1.2
 
 openrestyDir=${serverPath}/source/openresty
 
@@ -114,7 +114,7 @@ Install_openresty()
 
 	fi
 
-	if [[ "$VERSION" =~ "1.25.3" ]]; then
+	if [[ "$VERSION" =~ "1.25.3" ]] || [[ "$VERSION" =~ "1.27.1" ]];then
 		OPTIONS="${OPTIONS} --with-http_v3_module"
 
 		if [ ! -f ${openrestyDir}/libressl-${libresslVersion}.tar.gz ];then

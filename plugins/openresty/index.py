@@ -206,6 +206,11 @@ def confReplace():
         if not os.path.exists(a_conf):
             mw.writeFile(a_conf, mw.readFile(a_conf_tpl))
 
+    # copy resty lib
+    src_resty_dir = getPluginDir()+'/resty/*'
+    dst_resty_dir = getServerDir()+'/lualib/resty'
+    mw.execShell('cp -rf ' + src_resty_dir + ' ' + dst_resty_dir)
+
 
 def initDreplace():
 
@@ -347,7 +352,7 @@ def stop():
     return r
 
 
-def restart(version=()):
+def restart():
     return restyOp_restart()
 
 
@@ -436,18 +441,22 @@ def runInfo():
         data['Waiting'] = tmp[15]
         return mw.getJson(data)
     except Exception as e:
-        url = 'http://' + mw.getHostAddr() + ':%s/nginx_status' % port
-        result = mw.httpGet(url)
-        tmp = result.split()
-        data = {}
-        data['active'] = tmp[2]
-        data['accepts'] = tmp[9]
-        data['handled'] = tmp[7]
-        data['requests'] = tmp[8]
-        data['Reading'] = tmp[11]
-        data['Writing'] = tmp[13]
-        data['Waiting'] = tmp[15]
-        return mw.getJson(data)
+        try:
+            url = 'http://' + mw.getHostAddr() + ':%s/nginx_status' % port
+            result = mw.httpGet(url)
+            tmp = result.split()
+            data = {}
+            data['active'] = tmp[2]
+            data['accepts'] = tmp[9]
+            data['handled'] = tmp[7]
+            data['requests'] = tmp[8]
+            data['Reading'] = tmp[11]
+            data['Writing'] = tmp[13]
+            data['Waiting'] = tmp[15]
+            return mw.getJson(data)
+        except Exception as e:
+            return mw.returnJson(False, "oprenresty异常!")
+        
     except Exception as e:
         return mw.returnJson(False, "oprenresty not started!")
 
@@ -586,6 +595,26 @@ def setCfg():
     return mw.returnJson(True, '设置成功')
 
 
+def cronAddCheck():
+    try:
+        import tool_task
+        tool_task.createBgTask()
+        return mw.returnJson(True, '添加检查任务成功')
+    except Exception as e:
+        return mw.returnJson(False, '添加检查任务失败:'+str(e))
+
+def cronDelCheck():
+    try:
+        import tool_task
+        tool_task.removeBgTask()
+        return mw.returnJson(True, '删除检查任务成功')
+    except Exception as e:
+        return mw.returnJson(False, '删除检查任务失败:'+str(e))
+
+def cronCheck():
+    return 'ok'
+
+
 def installPreInspection():
     return 'ok'
 
@@ -629,5 +658,11 @@ if __name__ == "__main__":
         print(getCfg())
     elif func == 'set_cfg':
         print(setCfg())
+    elif func == 'check':
+        print(cronCheck())
+    elif func == 'cron_add_check':
+        print(cronAddCheck())
+    elif func == 'cron_del_check':
+        print(cronDelCheck())
     else:
         print('error')

@@ -55,8 +55,8 @@ VERSION_ID=`cat /etc/*-release | grep VERSION_ID | awk -F = '{print $2}' | awk -
 
 
 VERSION=9.1.0
-# https://dev.mysql.com/get/Downloads/MySQL-9.0/mysql-${VERSION}.tar.gz
-# https://cdn.mysql.com//Downloads/MySQL-9.0/mysql-boost-${VERSION}.tar.gz
+# https://dev.mysql.com/get/Downloads/MySQL-9.1/mysql-${VERSION}.tar.gz
+# https://cdn.mysql.com//Downloads/MySQL-9.1/mysql-boost-${VERSION}.tar.gz
 Install_mysql()
 {
 	mkdir -p ${mysqlDir}
@@ -104,11 +104,11 @@ Install_mysql()
 	fi
 
 	#检测文件是否损坏.
-	md5_mysql_ok=90dc27a8b64eee938a0bb045c580b80c
+	md5_mysql_ok=eb2c6bbd20569d2690bc7e34312f5210
 	if [ -f ${mysqlDir}/mysql-${VERSION}.tar.gz ];then
 		md5_mysql=`md5sum ${mysqlDir}/mysql-${VERSION}.tar.gz  | awk '{print $1}'`
 		if [ "${md5_mysql_ok}" == "${md5_mysql}" ]; then
-			echo "mysql9.0 file check ok"
+			echo "mysql9.1 file check ok"
 		else
 			# 重新下载
 			rm -rf ${mysqlDir}/mysql-${VERSION}
@@ -206,7 +206,7 @@ Install_mysql()
 
 		if [ -d $serverPath/mysql ];then
 			rm -rf ${mysqlDir}/mysql-${VERSION}
-			echo '9.0' > $serverPath/mysql/version.pl
+			echo '9.1' > $serverPath/mysql/version.pl
 			echo "${VERSION}安装完成"
 		else
 			# rm -rf ${mysqlDir}/mysql-${VERSION}

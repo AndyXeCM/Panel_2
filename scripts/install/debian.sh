@@ -81,14 +81,17 @@ apt install -y python3-venv
 apt install -y libncurses5
 apt install -y libncurses5-dev
 apt install -y bzip2
+apt install -y p7zip-full
 
 apt install -y libnuma1 
 apt install -y libaio1 
 apt install -y libmecab2
+apt install -y libmm-dev
 
 apt install -y dnsutils
 apt install -y apache2-utils
 apt install -y numactl
+apt install -y xxd
 
 P_VER=`python3 -V | awk '{print $2}'`
 if version_ge "$P_VER" "3.11.0" ;then
@@ -214,7 +217,8 @@ apt install -y libargon2-dev
 
 apt install -y libmemcached-dev
 apt install -y libsasl2-dev
-apt install -y imagemagick 
+apt install -y imagemagick
+apt install -y libmagickcore-dev
 apt install -y libmagickwand-dev
 
 apt install -y libxml2 libxml2-dev libbz2-dev libmcrypt-dev libpspell-dev librecode-dev

@@ -9,6 +9,7 @@ import subprocess
 import re
 import json
 
+from packaging import version as pk_version
 
 web_dir = os.getcwd() + "/web"
 if os.path.exists(web_dir):
@@ -335,6 +336,12 @@ def binLog(version = ''):
             return mw.returnJson(False, '0')
         con = con.replace('#log-bin=mysql-bin', 'log-bin=mysql-bin')
         con = con.replace('#binlog_format=mixed', 'binlog_format=mixed')
+
+        con = con.replace('skip-log-bin', '#skip-log-bin')
+        con = con.replace('disable-log-bin', '#disable-log-bin')
+        con = con.replace('skip-slave-start', '#skip-slave-start')
+
+        mw.writeFile(conf, con)
         mw.execShell('sync')
         restart(version)
     else:
@@ -349,11 +356,18 @@ def binLog(version = ''):
             return mw.returnJson(True, dsize)
         con = con.replace('log-bin=mysql-bin', '#log-bin=mysql-bin')
         con = con.replace('binlog_format=mixed', '#binlog_format=mixed')
+
+        con = con.replace('#skip-log-bin', 'skip-log-bin')
+        con = con.replace('#disable-log-bin', 'disable-log-bin')
+        con = con.replace('#skip-slave-start', 'skip-slave-start')
+
+        mw.writeFile(conf, con)
         mw.execShell('sync')
         restart(version)
         mw.execShell('rm -f ' + path + '/mysql-bin.*')
+        mw.execShell('rm -f ' + path + '/binlog.*')
 
-    mw.writeFile(conf, con)
+    
     return mw.returnJson(True, '设置成功!')
 
 
@@ -432,7 +446,14 @@ def getShowLogFile():
 
 
 def getMdb8Ver():
-    return ['8.0','8.1','8.2','8.3','8.4','9.0']
+    return ['8.0','8.1','8.2','8.3','8.4','9.0',"9.1","9.2","9.3","9.4"]
+
+
+def getSlaveName():
+    mdb8 = getMdb8Ver()
+    if mw.inArray(mdb8, version):
+        return 'replica'
+    return 'slave'
 
 def pGetDbUser():
     if mw.isAppleSystem():
@@ -852,8 +873,8 @@ def runInfo(version):
     return mw.getJson(result)
 
 
-def myDbStatus(version):
-    if status(version) == 'stop':
+def myDbStatus(ver):
+    if status(ver) == 'stop':
         return mw.returnJson(False, 'MySQL未启动', [])
 
     result = {}
@@ -866,7 +887,7 @@ def myDbStatus(version):
     gets = ['table_open_cache', 'thread_cache_size', 'key_buffer_size', 'tmp_table_size', 'max_heap_table_size', 'innodb_buffer_pool_size',
             'innodb_additional_mem_pool_size', 'innodb_log_buffer_size', 'max_connections', 'sort_buffer_size', 'read_buffer_size', 'read_rnd_buffer_size', 'join_buffer_size', 'thread_stack', 'binlog_cache_size']
 
-    if version != "8.0":
+    if pk_version.parse(ver) < pk_version.parse("8.0"):
         gets.append('query_cache_size')
 
     result['mem'] = {}
@@ -879,12 +900,11 @@ def myDbStatus(version):
     return mw.getJson(result)
 
 
-def setDbStatus(version):
+def setDbStatus(ver):
     gets = ['key_buffer_size', 'tmp_table_size', 'max_heap_table_size', 'innodb_buffer_pool_size', 'innodb_log_buffer_size', 'max_connections',
             'table_open_cache', 'thread_cache_size', 'sort_buffer_size', 'read_buffer_size', 'read_rnd_buffer_size', 'join_buffer_size', 'thread_stack', 'binlog_cache_size']
 
-    if version != "8.0":
-        # gets.append('query_cache_size')
+    if pk_version.parse(ver) < pk_version.parse("8.0"):
         gets = ['key_buffer_size', 'query_cache_size', 'tmp_table_size', 'max_heap_table_size', 'innodb_buffer_pool_size', 'innodb_log_buffer_size', 'max_connections',
                 'table_open_cache', 'thread_cache_size', 'sort_buffer_size', 'read_buffer_size', 'read_rnd_buffer_size', 'join_buffer_size', 'thread_stack', 'binlog_cache_size']
 
@@ -955,6 +975,9 @@ def __createUser(dbname, username, password, address):
 
 def getDbBackupListFunc(dbname=''):
     bkDir = mw.getBackupDir() + '/database'
+    if not os.path.exists(bkDir):
+        mw.execShell('mkdir -p ' + bkDir)
+
     blist = os.listdir(bkDir)
     r = []
 
@@ -1260,6 +1283,8 @@ def getDbBackupList():
     rr = []
     for x in range(0, len(r)):
         p = bkDir + '/' + r[x]
+        if not os.path.exists(p):
+            continue
         data = {}
         data['name'] = r[x]
 
@@ -1454,27 +1479,90 @@ def syncToDatabases():
     msg = mw.getInfo('本次共同步了{1}个数据库!', (str(n),))
     return mw.returnJson(True, msg)
 
+def adjust_password_policy(version):
+    if version.startswith("8."):
+        serverdir = getServerDir()
+        mw.execShell(serverdir+f"/bin/mysql -u root -e \"SET GLOBAL validate_password.policy=LOW;\"")
+        mw.execShell(serverdir+f"/bin/mysql -u root -e \"SET GLOBAL validate_password.length=4;\"")
+
+def setRootPwdForce(new_password,version=''):
+    # stop(version)
+    # | awk '{print $2}'| xargs kill
+    data = mw.execShell("ps -ef|grep mysql|grep -v plugins |grep -v grep | awk '{print $2}'| xargs kill")
+    # print(data)
+    time.sleep(1)
+
+    serverdir = getServerDir()
+
+    # 启动安全模式
+    cmd_msafe = serverdir+"/bin/mysqld_safe --skip-grant-tables --skip-networking"
+    # print("cmd_msafe",cmd_msafe)
+    subprocess.Popen(cmd_msafe, stdout=subprocess.PIPE, shell=True,bufsize=4096, stderr=subprocess.PIPE)
+    # 等待MySQL安全模式启动...
+    time.sleep(5)
+
+    if version.startswith("5.5") or version.startswith("5.6"):
+        cmd_mod_root = serverdir+f"/bin/mysql -u root -e \"UPDATE mysql.user SET Password=PASSWORD('{new_password}') WHERE user='root'; FLUSH PRIVILEGES;\""
+        data = mw.execShell(cmd_mod_root)
+        # print("修改root密码", cmd_mod_root)
+        # print(data)
+    else:
+        cmd_clear_root = serverdir+"/bin/mysql -u root -e \"UPDATE mysql.user SET authentication_string = '' WHERE user = 'root'; FLUSH PRIVILEGES;\""
+        data = mw.execShell(cmd_clear_root)
+        # print(cmd_clear_root,"清空root密码",data)
+
+    data = mw.execShell("ps -ef|grep mysql|grep -v plugins |grep -v grep | awk '{print $2}'| xargs kill")
+    # print("停止安全模式",data)
+
+    # 正常启动MySQL
+    start(version)
+    time.sleep(5)
+    
+    if not version.startswith("5.5") and not version.startswith("5.6"):
+        # 针对MySQL 8.0+调整密码策略
+        if version.startswith("8."):
+            adjust_password_policy(version)
+        # 设置新密码
+        cmd_newpass = serverdir+f"/bin/mysql -u root -e \"ALTER USER 'root'@'localhost' IDENTIFIED BY '{new_password}'; FLUSH PRIVILEGES;\""
+        data = mw.execShell(cmd_newpass)
+        # print("新密码",cmd_newpass)
+        # print(data)
+    
+    # 验证密码
+    cmd = serverdir+f"/bin/mysql -u root -p'{new_password}' -e 'SHOW DATABASES;'"
+    data = mw.execShell(cmd)
+    if data[1] == '':
+        return True
+    return False
+
 
 def setRootPwd(version=''):
     args = getArgs()
     data = checkArgs(args, ['password'])
     if not data[0]:
         return data[1]
+    password = args['password']
 
     #强制修改
     force = 0
     if 'force' in args and args['force'] == '1':
-        force = 1
+        pSqliteDb('config').where('id=?', (1,)).save('mysql_root', (password,))
+        return mw.returnJson(True, '【强制本地记录】数据库root密码修改成功(立马检查)!')
+    if 'force' in args and args['force'] == '2':
+        force = 2
+        ok = setRootPwdForce(password,version)
 
-    password = args['password']
+        pSqliteDb('config').where('id=?', (1,)).save('mysql_root', (password,))
+        if ok and version.startswith("8"):
+            pdb = pMysqlDb()
+            pdb.query("SET GLOBAL validate_password.policy=MEDIUM;")
+        return mw.returnJson(True, '【强制】数据库root密码修改成功!')
+    
     try:
         pdb = pMysqlDb()
         result = pdb.query("show databases")
         isError = isSqlError(result)
         if isError != None:
-            if force == 1:
-                pSqliteDb('config').where('id=?', (1,)).save('mysql_root', (password,))
-                return mw.returnJson(True, '【强制修改】数据库root密码修改成功(不意为成功连接数据)!')
             return isError
 
         if version.find('5.7') > -1 or version.find('8.0') > -1:
@@ -2376,7 +2464,6 @@ def addMasterRepSlaveUser(version=''):
 
 
 def getMasterRepSlaveUserCmd(version):
-
     args = getArgs()
     data = checkArgs(args, ['username', 'db'])
     if not data[0]:
@@ -2399,7 +2486,10 @@ def getMasterRepSlaveUserCmd(version):
     port = getMyPort()
     db = pMysqlDb()
 
-    mstatus = db.query('show master status')
+    cmd_status = "show master status"
+    if pk_version.parse(version) > pk_version.parse("8.0"):
+        cmd_status = "SHOW BINARY LOG STATUS"
+    mstatus = db.query(cmd_status)
     if len(mstatus) == 0:
         return mw.returnJson(False, '未开启!')
 
@@ -2848,11 +2938,13 @@ def initSlaveStatusSyncUser(version=''):
     if len(slave_data) < 1:
         return mw.returnJson(False, '需要先添加同步用户配置!')
 
+    slave_name = getSlaveName()
     # print(data)
     pdb = pMysqlDb()
     if len(slave_data) == 1:
-        dlist = pdb.query('show slave status')
-        if len(dlist) > 0:
+        cmd_slave = 'show '+slave_name+' status'
+        dlist = pdb.query(cmd_slave)
+        if dlist and len(dlist) > 0:
             return mw.returnJson(False, '已经初始化好了zz...')
 
     msg = ''
@@ -2889,8 +2981,8 @@ def initSlaveStatusSyncUser(version=''):
         # pdb.query("start slave user='{}' password='{}';".format(
         #     u['user'], u['pass']))
 
-    pdb.query("start slave")
-    pdb.query("start all slaves")
+    pdb.query("start "+slave_name)
+    pdb.query("start all "+slave_name)
 
     if msg == '':
         msg = '初始化成功!'
@@ -2898,8 +2990,9 @@ def initSlaveStatusSyncUser(version=''):
 
 
 def initSlaveStatusSSH(version=''):
+    slave_name = getSlaveName()
     db = pMysqlDb()
-    dlist = db.query('show slave status')
+    dlist = db.query('show '+slave_name+' status')
 
     conn = pSqliteDb('slave_id_rsa')
     ssh_list = conn.field('ip,port,id_rsa,db_user').select()
@@ -2913,8 +3006,8 @@ def initSlaveStatusSSH(version=''):
     paramiko.util.log_to_file('paramiko.log')
     ssh = paramiko.SSHClient()
 
-    db.query('stop slave')
-    db.query('reset slave all')
+    db.query('stop '+slave_name)
+    db.query('reset '+slave_name+' all')
     for data in ssh_list:
         ip = data['ip']
         SSH_PRIVATE_KEY = "/tmp/t_ssh_" + ip + ".txt"
@@ -2967,7 +3060,7 @@ def initSlaveStatusSSH(version=''):
                 os.system("rm -rf " + SSH_PRIVATE_KEY)
         except Exception as e:
             return mw.returnJson(False, '[主][' + ip + ']:SSH认证配置连接失败!' + str(e))
-    db.query('start slave')
+    db.query('start '+slave_name)
     return mw.returnJson(True, '初始化成功!')
 
 
@@ -2978,18 +3071,21 @@ def setSlaveStatus(version=''):
 
     mode = mw.readFile(mode_file)
     pdb = pMysqlDb()
-    dlist = pdb.query('show slave status')
+
+    slave_name = getSlaveName()
+    dlist = pdb.query(cmd)
     if len(dlist) == 0:
         return mw.returnJson(False, '需要手动添加同步账户或者执行初始化!')
 
     for v in dlist:
         connection_name = ''
-        cmd = "slave"
         if 'Channel_Name' in v:
             ch_name = v['Channel_Name']
-            cmd = "slave for channel '{}'".format(ch_name)
+            cmd = slave_name + " for channel '{}'".format(ch_name)
 
-        if (v["Slave_IO_Running"] == 'Yes' or v["Slave_SQL_Running"] == 'Yes'):
+        if (( 'Slave_IO_Running' in v and v["Slave_IO_Running"] == 'Yes') or ('Slave_SQL_Running' in v and v["Slave_SQL_Running"] == 'Yes')):
+            pdb.query("stop {}".format(cmd))
+        elif (( 'Replica_IO_Running' in v and v["Replica_IO_Running"] == 'Yes') or ( 'Replica_SQL_Running' in v and v["Replica_SQL_Running"] == 'Yes') ):
             pdb.query("stop {}".format(cmd))
         else:
             pdb.query("start {}".format(cmd))
@@ -2998,12 +3094,14 @@ def setSlaveStatus(version=''):
 
 def deleteSlaveFunc(sign = ''):
     db = pMysqlDb()
+    slave_name = getSlaveName()
     if sign !=  '':
-        db.query("stop slave for channel '{}'".format(sign))
-        db.query("reset slave all for channel '{}'".format(sign))
+        db.query("stop {} for channel '{}'".format(slave_name,sign))
+        db.query("reset {} all for channel '{}'".format(slave_name, sign))
     else:
-        db.query('stop slave')
-        db.query('reset slave all')
+        db.query('stop '+slave_name)
+        db.query('reset '+slave_name+' all')
+        
 
 def deleteSlave(version=''):
     args = getArgs()
@@ -3170,11 +3268,15 @@ def syncDatabaseRepair(version=''):
         sync_count_data = sync_db.query(cmd_count_sql)
 
         if local_count_data != sync_count_data:
-            print("all data compare: ",local_count_data, sync_count_data)
-            inconsistent_table.append(table_name)
-            diff = sync_count_data[0]['num'] - local_count_data[0]['num']
-            print(table_name+', need sync. diff,'+str(diff))
-            mw.writeFile(tmp_log, table_name+', need sync. diff,'+str(diff)+'\n','a+')
+            if sync_count_data == None:
+                print("sync:"+table_name+" is not exists!!!")
+                mw.writeFile(tmp_log, "sync:"+table_name+" is not exists!!!"+'\n','a+')
+            else:
+                print("all data compare: ",local_count_data, sync_count_data)
+                inconsistent_table.append(table_name)
+                diff = sync_count_data[0]['num'] - local_count_data[0]['num']
+                print(table_name+', need sync. diff,'+str(diff))
+                mw.writeFile(tmp_log, table_name+', need sync. diff,'+str(diff)+'\n','a+')
         else:
             print(table_name+' check ok.')
             mw.writeFile(tmp_log, table_name+' check ok.\n','a+')
@@ -3390,10 +3492,13 @@ def doFullSyncUserImportContentForChannel(file, channel_name):
     # print(file, channel_name)
     content = mw.readFile(file)
 
-    content = content.replace('STOP SLAVE;', "STOP SLAVE for channel '{}';".format(channel_name))
-    content = content.replace('START SLAVE;', "START SLAVE for channel '{}';".format(channel_name))
+    slave_name = getSlaveName()
+    slave_name = slave_name.upper()
 
-    find_head = r"CHANGE MASTER TO "
+    content = content.replace('STOP '+slave_name+';', "STOP {} for channel '{}';".format(slave_name,channel_name))
+    content = content.replace('START '+slave_name+';', "START {} for channel '{}';".format(slave_name,channel_name))
+
+    find_head = "CHANGE MASTER TO "
     find_re = find_head+"(.*?);"
     find_r = re.search(find_re, content, re.I|re.M)
     if find_r:
@@ -3408,6 +3513,7 @@ def doFullSyncUserImportContentForChannel(file, channel_name):
 
 
 def doFullSyncUser(version=''):
+    slave_name = getSlaveName()
     which_pv = mw.execShell('which pv')
     is_exist_pv = False
     if os.path.exists(which_pv[0]):
@@ -3469,9 +3575,9 @@ def doFullSyncUser(version=''):
 
     mdb8 = getMdb8Ver()
     if mw.inArray(mdb8,version):
-        db.query("stop slave user='{}' password='{}';".format(user, apass))
+        db.query("stop {} user='{}' password='{}';".format(slave_name,user, apass))
     else:
-        db.query("stop slave")
+        db.query("stop "+slave_name)
         
     time.sleep(1)
 
@@ -3494,6 +3600,11 @@ def doFullSyncUser(version=''):
         return False
 
     time_s = time.time()
+
+    ssl_mode = '--ssl-mode=DISABLED'
+    if pk_version.parse(version) > pk_version.parse("8.0"):
+        ssl_mode = '--ssl-mode=REQUIRED'
+
     if not os.path.exists(bak_file):
         dmp_option += ' '
         if mw.inArray(mdb8,version):
@@ -3503,7 +3614,7 @@ def doFullSyncUser(version=''):
             dmp_option += " --master-data=1 --apply-slave-statements --include-master-host-port --compress "
 
         dump_sql_data = getServerDir() + "/bin/mysqldump --single-transaction --default-character-set=utf8mb4 -q " + dmp_option + " -h" + ip + " -P" + \
-            port + " -u" + user + " -p'" + apass + "' --ssl-mode=DISABLED " + sync_db + " > " + bak_file
+            port + " -u" + user + " -p'" + apass + "' " + ssl_mode + " " + sync_db + " > " + bak_file
         print(dump_sql_data)
         time_s = time.time()
         r = mw.execShell(dump_sql_data)
@@ -3562,9 +3673,9 @@ def doFullSyncUser(version=''):
     if mw.inArray(mdb8,version):
         db.query("start replica user='{}' password='{}';".format(user, apass))
     else:
-        db.query("start slave")
+        db.query("start "+slave_name)
 
-    db.query("start all slaves")
+    db.query("start all "+slave_name)
     time_all_e = time.time()
     cos = time_all_e - time_all_s
     writeDbSyncStatus({'code': 6, 'msg': '总耗时:'+str(int(cos))+'秒,从库重启完成...', 'progress': 100})

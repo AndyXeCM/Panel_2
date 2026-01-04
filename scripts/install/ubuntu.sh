@@ -39,6 +39,7 @@ apt install -y libncurses5
 apt install -y libncurses5-dev
 apt install -y software-properties-common
 apt install -y bzip2
+apt install -y p7zip-full
 
 apt install -y libnuma1
 apt install -y libaio1
@@ -46,9 +47,11 @@ apt install -y libaio-dev
 apt install -y libmecab2
 apt install -y numactl
 apt install -y libaio1t64
+apt install -y libmm-dev
 
 apt install -y dnsutils
 apt install -y numactl
+apt install -y xxd
 
 # https://www.php.net/manual/zh/mysql-xdevapi.installation.php
 apt install -y libprotobuf-dev
@@ -152,7 +155,8 @@ apt install -y libargon2-dev
 
 apt install -y libmemcached-dev
 apt install -y libsasl2-dev
-apt install -y imagemagick 
+apt install -y imagemagick
+apt install -y libmagickcore-dev
 apt install -y libmagickwand-dev
 
 apt install -y libxml2 libxml2-dev libbz2-dev libmcrypt-dev libpspell-dev librecode-dev

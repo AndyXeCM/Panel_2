@@ -261,6 +261,10 @@ class sites(object):
         mw.restartWeb()
         return mw.returnData(True, '站点已启用!')
 
+    def nginxAddDomainFilter(self, site_id, site_name, domain, port):
+        self.nginxAddDomain(site_name, domain, port)
+        return True
+
     def nginxAddDomain(self, site_name, domain, port):
         file = self.getHostConf(site_name)
         conf = mw.readFile(file)
@@ -312,7 +316,7 @@ class sites(object):
             if thisdb.checkSitesDomainIsExist(name, port):
                 return mw.returnData(False, '您添加的域名[{}:{}],已使用。请仔细检查!'.format(name, port))
 
-            self.nginxAddDomain(site_name, name, port)
+            self.nginxAddDomainFilter(site_id, site_name, name, port)
 
             msg = mw.getInfo('网站[{1}]添加域名[{2}]成功!', (site_name, name))
             mw.writeLog('网站管理', msg)
@@ -1376,7 +1380,7 @@ class sites(object):
             if _keep_path == 1:
                 _to = "{}$request_uri".format(to)
 
-            redirect_type = "301" if _type_code == 0 else "302"
+            redirect_type = "301" if _r_type == 0 else "302"
             _if = "if ($host ~ '^{}')".format(site_from)
             _return = "return {} {}; ".format(redirect_type, to)
             file_content = _if + "{\r\n    " + _return + "\r\n}"
@@ -1534,7 +1538,7 @@ location ^~ {from} {\n\
 # PROXY-END"
 
         tpl_proxy_cache = "\n\
-    if ( $uri ~* \\.(gif|png|jpg|jpeg|css|js|ttf|woff|woff2)$\" )\n\
+    if ( $uri ~* \\.(gif|png|jpg|jpeg|css|js|ttf|woff|woff2)$ )\n\
     {\n\
         expires {cache_time}m;\n\
     }\n\
@@ -1545,7 +1549,7 @@ location ^~ {from} {\n\
 "
         tpl_proxy_nocache_bak = "\n\
     set $static_files_app 0; \n\
-    if ( $uri ~* \\.(gif|png|jpg|jpeg|css|js|ttf|woff|woff2)$\" )\n\
+    if ( $uri ~* \\.(gif|png|jpg|jpeg|css|js|ttf|woff|woff2)$ )\n\
     {\n\
         set $static_files_app 1;\n\
         expires 12h;\n\
@@ -1990,7 +1994,8 @@ location ^~ {from} {\n\
         dnsapi_option = [
             {"name":"none", "title":'手动解析', 'key':'', 'help':''},
             {"name":"dns_ali", "title":'Aliyun', 'key':'Ali_Key:Ali_Secret', 'help':'阿里云控制台》用户头像》accesskeys按指引获取AccessKey/SecretKey'},
-            {"name":"dns_cf", "title":'cloudflare', 'key':'CF_Key:CF_Email', 'help':'CloudFlare后台获取Global API Key'},
+            {"name":"dns_huaweicloud", "title":'华为云', 'key':'HUAWEICLOUD_Username:HUAWEICLOUD_Password:HUAWEICLOUD_DomainName'},
+            {"name":"dns_cf", "title":'cloudflare', 'key':'CF_Key:CF_Email:CF_Token:CF_Account_ID:CF_Zone_ID', 'help':'CloudFlare后台获取Global API Key'},
             {"name":"dns_dp", "title":'dnspod/国内', 'key':'DP_Id:DP_Key','help':'DnsPod后台》用户中心》安全设置，开启API Token'},
             {"name":"dns_dpi", "title":'dnspod/国际', 'key':'DPI_Id:DPI_Key','help':'DnsPod后台》用户中心》安全设置，开启API Token'},
             {"name":"dns_tencent", "title":"腾讯云DNS", 'key':'Tencent_SecretId:Tencent_SecretKey', 'help':'腾讯云后台获取通行证'},
@@ -2148,7 +2153,7 @@ location ^~ {from} {\n\
         mw.restartWeb()
         return mw.returnData(True, '删除成功')
 
-    def createAcmeFile(self, site_name, domains, email, force, renew):
+    def createAcmeFile(self, site_name, apply_ca, domains, email, force, renew):
         site_conf = self.getHostConf(site_name)
         if not os.path.exists(site_conf):
             return mw.returnData(False, '配置异常!')
@@ -2199,7 +2204,15 @@ location ^~ {from} {\n\
         self.writeAcmeLog('开始ACME申请...')
         log_file = self.acmeLogFile()
 
+        if apply_ca == "let": 
+            cmd = cmd + " --server letsencrypt "
+        elif apply_ca == "zerossl":
+            cmd = cmd + " --server zerossl "
+        elif apply_ca == "buypass":
+            cmd = cmd + " --server buypass "
+
         cmd = 'export ACCOUNT_EMAIL=' + email + ' && ' + cmd + ' >> ' + log_file
+        # print(cmd)
         result = mw.execShell(cmd)
 
         # 开启代理
@@ -2257,7 +2270,17 @@ location ^~ {from} {\n\
             def_var += 'export '+k+'="'+data[k]+'"\n'
         return def_var
 
+    # def getDomainRootName(self, domain):
+    #     s = domain.split('.',1)
+    #     return s[1]
+
     def getDomainRootName(self, domain):
+        import tldextract
+        extracted = tldextract.extract(domain)
+        # 组合注册域名和顶级域名
+        return f"{extracted.domain}.{extracted.suffix}"
+
+    def getDomainRootName_Old(self, domain):
         s = domain.split('.')
         count = len(s)
         last_index = count - 1
@@ -2346,7 +2369,7 @@ export PATH
         mw.restartWeb()
         return mw.returnData(True, '证书已更新!', result)
 
-    def createAcmeDns(self, site_name, domains, email, dnspai, wildcard_domain, force, renew, dns_alias):
+    def createAcmeDns(self, site_name, apply_ca, domains, email, dnspai, wildcard_domain, force, renew, dns_alias):
         dnsapi_option = thisdb.getOptionByJson('dnsapi', default={})
         log_file = self.acmeLogFile()
         cmd = 'echo "..." > '+ log_file
@@ -2383,6 +2406,14 @@ export PATH
 
             if dns_alias != '':
                 cmd += ' --domain-alias '+str(dns_alias)
+
+
+            if apply_ca == "let": 
+                cmd = cmd + " --server letsencrypt "
+            elif apply_ca == "zerossl":
+                cmd = cmd + " --server zerossl "
+            elif apply_ca == "buypass":
+                cmd = cmd + " --server buypass "
                 
             cmd +=  ' > ' + log_file
             # print(cmd)
@@ -2432,7 +2463,7 @@ export PATH
         mw.restartWeb()
         return mw.returnData(True, '证书已更新!', result)
 
-    def createAcme(self, site_name, domains, force, renew, apply_type, dnspai, email, wildcard_domain, dns_alias):
+    def createAcme(self, site_name, domains, force, renew, apply_type, apply_ca, dnspai, email, wildcard_domain, dns_alias):
         domains = json.loads(domains)
         if len(domains) < 1:
             return mw.returnData(False, '请选择域名')
@@ -2458,9 +2489,9 @@ export PATH
             return mw.returnData(False, '正在申请或更新SSL中...')
 
         if apply_type == 'file':
-            return self.createAcmeFile(site_name, domains, email,force,renew)
+            return self.createAcmeFile(site_name, apply_ca, domains, email,force,renew)
         elif apply_type == 'dns':
-            return self.createAcmeDns(site_name, domains, email, dnspai, wildcard_domain,force, renew, dns_alias)
+            return self.createAcmeDns(site_name, apply_ca,domains, email, dnspai, wildcard_domain,force, renew, dns_alias)
         return mw.returnData(False, '异常请求')
 
     def createLet(self, site_name, domains, force, renew, apply_type, dnspai, email, wildcard_domain):
