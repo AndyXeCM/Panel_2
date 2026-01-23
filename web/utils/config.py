@@ -9,6 +9,7 @@
 # ---------------------------------------------------------------------------------
 
 import os
+import re
 
 import core.mw as mw
 import thisdb
@@ -86,5 +87,19 @@ def getGlobalVar():
     data['panel_api'] = thisdb.getOptionByJson('panel_api', default={'open':False})
     data['panel_ssl'] = thisdb.getOptionByJson('panel_ssl', default={'open':False})
     data['panel_domain'] = thisdb.getOption('panel_domain', default='')
+
+    panel_theme = thisdb.getOptionByJson('panel_theme', default={})
+    sidebar_color = panel_theme.get('sidebar_color', '#3c444d')
+    topbar_color = panel_theme.get('topbar_color', '#ffffff')
+    color_re = r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$'
+    if not re.match(color_re, sidebar_color):
+        sidebar_color = '#3c444d'
+    if not re.match(color_re, topbar_color):
+        topbar_color = '#ffffff'
+    data['panel_theme'] = {
+        'background_url': panel_theme.get('background_url', ''),
+        'sidebar_color': sidebar_color,
+        'topbar_color': topbar_color,
+    }
     
     return data

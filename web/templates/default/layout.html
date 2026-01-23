@@ -10,6 +10,15 @@
 <link href="/static/bootstrap-3.3.5/css/bootstrap.min.css?v={{config.version}}" rel="stylesheet">
 <link href="/static/css/site.css?v={{config.version}}" rel="stylesheet">
 <link href="/static/codemirror/lib/codemirror.css?v={{config.version}}" rel="stylesheet">
+{% set panel_theme = data.get('panel_theme', {}) %}
+{% set panel_bg_url = panel_theme.get('background_url', '') %}
+<style>
+    :root {
+        --panel-bg-image: {% if panel_bg_url %}url("{{ panel_bg_url|e }}"){% else %}none{% endif %};
+        --panel-sidebar-bg: {{ panel_theme.get('sidebar_color', '#3c444d')|e }};
+        --panel-topbar-bg: {{ panel_theme.get('topbar_color', '#ffffff')|e }};
+    }
+</style>
 <script src="/static/language/Simplified_Chinese/lan.js?v={{config.version}}"></script>
 <!--[if lte IE 9]>
 	<script src="/static/js/requestAnimationFrame.js"></script>

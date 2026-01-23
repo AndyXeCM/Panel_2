@@ -69,6 +69,26 @@ $('input[name="backup_path"]').change(function(){
 	});
 });
 
+function bindPanelThemeSave(){
+	var backgroundUrl = $('input[name="panel_bg_url"]').val().trim();
+	var sidebarColor = $('input[name="panel_sidebar_color"]').val();
+	var topbarColor = $('input[name="panel_topbar_color"]').val();
+	$('.btn_panel_theme').removeAttr('disabled');
+	$('.btn_panel_theme').unbind().click(function(){
+		$.post('/setting/set_panel_theme',{
+			'background_url': backgroundUrl,
+			'sidebar_color': sidebarColor,
+			'topbar_color': topbarColor
+		}, function(rdata){
+			showMsg(rdata.msg,function(){window.location.reload();},{icon:rdata.status?1:2},2000);
+		},'json');
+	});
+}
+
+$('input[name="panel_bg_url"], input[name="panel_sidebar_color"], input[name="panel_topbar_color"]').change(function(){
+	bindPanelThemeSave();
+});
+
 
 $('input[name="bind_domain"]').change(function(){
 	var domain = $(this).val();
