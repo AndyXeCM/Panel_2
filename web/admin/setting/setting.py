@@ -247,4 +247,38 @@ def set_port():
         mw.restartMw()
 
     return mw.returnData(True, '端口保存成功!')
+
+
+# 设置面板主题
+@blueprint.route('/set_panel_theme', endpoint='set_panel_theme', methods=['POST'])
+@panel_login_required
+def set_panel_theme():
+    background_url = request.form.get('background_url', '').strip()
+    sidebar_color = request.form.get('sidebar_color', '').strip()
+    topbar_color = request.form.get('topbar_color', '').strip()
+
+    if background_url:
+        background_url = background_url.replace('"', '').replace("'", '')
+        if len(background_url) > 500:
+            return mw.returnData(False, '背景图片地址过长!')
+        if not re.match(r'^(https?://|/)', background_url):
+            return mw.returnData(False, '背景图片地址格式不正确!')
+
+    def normalize_color(value, default):
+        if not value:
+            return default
+        if re.match(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$', value):
+            return value.lower()
+        if re.match(r'^rgba?\((\s*\d+\s*,){2}\s*[\d.]+%?\s*(,\s*[\d.]+\s*)?\)$', value):
+            return value
+        return default
+
+    panel_theme = {
+        'background_url': background_url,
+        'sidebar_color': normalize_color(sidebar_color, '#3c444d'),
+        'topbar_color': normalize_color(topbar_color, '#ffffff'),
+    }
+    thisdb.setOption('panel_theme', json.dumps(panel_theme))
+    mw.writeLog('面板设置', '更新面板主题配置')
+    return mw.returnData(True, '面板主题设置成功!')
  
